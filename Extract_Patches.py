@@ -11,7 +11,7 @@ import glob
 slides_path = '/home/pouya/Develop/Sayna/Codes/Data/Slides'
 annotation_dir = '/home/pouya/Develop/Sayna/Codes/Data/Annotations'
 output_dir = '/home/pouya/Develop/Sayna/Codes/Data/Patches'
-patch_size = (1024, 1024)
+patch_size = (2048, 2048)
 resize_size = (256, 256)
 
 os.makedirs(output_dir, exist_ok=True)
@@ -75,5 +75,5 @@ for annotation_path in annotation_files:
                         os.makedirs(os.path.join(output_dir, case_id, label), exist_ok=True)
                         patch_img.save(os.path.join(output_dir, case_id, label, f'patch_{i}_{x}_{y}.png'))
 
-            # Close the slide
-            slide.close()
+    # Close the slide
+    slide.close()
