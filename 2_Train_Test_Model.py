@@ -7,7 +7,8 @@ import numpy as np
 import os
 
 # Define the path to the input data
-input_path = '/home/pouya/Develop/Sayna/Codes/Data/Patches'
+input_path = 'D:/Develop/Sayna/Data'
+num_epochs = 25
 
 # Define the transformations
 transform = transforms.Compose([
@@ -31,21 +32,27 @@ skf = StratifiedKFold(n_splits=n_splits)
 
 # Define the device
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+print(f'Device: {device}')
 
-# Define the model
-model = models.resnet50(pretrained=True)
-num_ftrs = model.fc.in_features
-model.fc = nn.Linear(num_ftrs, 2)
-model = model.to(device)
+def create_model():
+    # Define the model
+    model = models.resnet50(pretrained=True)
+    num_ftrs = model.fc.in_features
+    model.fc = nn.Linear(num_ftrs, 2)
+    model = model.to(device)
 
-# Define the loss function
-criterion = nn.CrossEntropyLoss()
+    # Define the loss function
+    criterion = nn.CrossEntropyLoss()
 
-# Define the optimizer
-optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
+    # Define the optimizer
+    optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
+
+    return model, criterion, optimizer
 
 # Perform the stratified k-fold cross-validation
+accuracies, sensitivities, specificities = [], [], []
 for train_index, val_index in skf.split(np.zeros(len(dataset)), labels):
+    model, criterion, optimizer = create_model()
     # Create the train and validation datasets
     train_dataset = torch.utils.data.Subset(dataset, train_index)
     val_dataset = torch.utils.data.Subset(dataset, val_index)
@@ -53,9 +60,9 @@ for train_index, val_index in skf.split(np.zeros(len(dataset)), labels):
     # Create the data loaders
     train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=64, shuffle=False)
-
+    print(f'Train size: {len(train_loader.dataset)}, Validation size: {len(val_loader.dataset)}')
     # Train the model
-    for epoch in range(25):
+    for epoch in range(1, num_epochs+1):
         model.train()
         for inputs, labels in train_loader:
             inputs = inputs.to(device)
@@ -68,18 +75,38 @@ for train_index, val_index in skf.split(np.zeros(len(dataset)), labels):
             loss.backward()
             optimizer.step()
 
-        # Evaluate the model
-        model.eval()
-        with torch.no_grad():
-            correct = 0
-            total = 0
-            for inputs, labels in val_loader:
-                inputs = inputs.to(device)
-                labels = labels.to(device)
+        if(epoch % 5 == 0):
+            print(f'Epoch {epoch}/{num_epochs}, Loss: {loss.item()}')
 
-                outputs = model(inputs)
-                _, predicted = torch.max(outputs.data, 1)
-                total += labels.size(0)
-                correct += (predicted == labels).sum().item()
+        if(epoch == num_epochs):
+            # Evaluate the model
+            model.eval()
+            with torch.no_grad():
+                correct, total, TP, TN, FP, FN = 0, 0, 0, 0, 0, 0
+                for inputs, labels in val_loader:
+                    inputs = inputs.to(device)
+                    labels = labels.to(device)
 
+                    outputs = model(inputs)
+                    _, predicted = torch.max(outputs.data, 1)
+                    total += labels.size(0)
+                    correct += (predicted == labels).sum().item()
+                    TP += ((predicted == 1) & (labels == 1)).sum().item()
+                    TN += ((predicted == 0) & (labels == 0)).sum().item()
+                    FP += ((predicted == 1) & (labels == 0)).sum().item()
+                    FN += ((predicted == 0) & (labels == 1)).sum().item()
+            sensitivity = TP / (TP + FN)
+            specificity = TN / (TN + FP)
+            print(f'Sensitivity: {sensitivity * 100}%')
+            print(f'Specificity: {specificity * 100}%')
             print(f'Accuracy: {correct / total * 100}%')
+            accuracies.append(correct / total * 100)
+            sensitivities.append(sensitivity)
+            specificities.append(specificity)
+
+print(f'Average accuracy: {np.mean(accuracies)}%')
+print(f'Average sensitivity: {np.mean(sensitivities) * 100}%')
+print(f'Average specificity: {np.mean(specificities) * 100}%')
+
+
+            
