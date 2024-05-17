@@ -1,4 +1,5 @@
 import torch
+print(torch.cuda.is_available()
 from torch import nn, optim
 from torch.utils.data import DataLoader, random_split
 from torchvision import datasets, transforms, models
@@ -7,7 +8,7 @@ import numpy as np
 import os
 
 # Define the path to the input data
-input_path = 'D:/Develop/Sayna/Data'
+input_path = 'D:/Develop/Sayna/patch'
 num_epochs = 25
 
 # Define the transformations
@@ -49,18 +50,18 @@ def create_model():
 
     return model, criterion, optimizer
 
-# Perform the stratified k-fold cross-validation
+# Perform the stratified k-fold cross-test
 accuracies, sensitivities, specificities = [], [], []
-for train_index, val_index in skf.split(np.zeros(len(dataset)), labels):
+for train_index, test_index in skf.split(np.zeros(len(dataset)), labels):
     model, criterion, optimizer = create_model()
-    # Create the train and validation datasets
+    # Create the train and test datasets
     train_dataset = torch.utils.data.Subset(dataset, train_index)
-    val_dataset = torch.utils.data.Subset(dataset, val_index)
+    test_dataset = torch.utils.data.Subset(dataset, test_index)
 
     # Create the data loaders
     train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=64, shuffle=False)
-    print(f'Train size: {len(train_loader.dataset)}, Validation size: {len(val_loader.dataset)}')
+    test_loader = DataLoader(test_dataset, batch_size=64, shuffle=False)
+    print(f'Train size: {len(train_loader.dataset)}, test size: {len(test_loader.dataset)}')
     # Train the model
     for epoch in range(1, num_epochs+1):
         model.train()
@@ -83,7 +84,7 @@ for train_index, val_index in skf.split(np.zeros(len(dataset)), labels):
             model.eval()
             with torch.no_grad():
                 correct, total, TP, TN, FP, FN = 0, 0, 0, 0, 0, 0
-                for inputs, labels in val_loader:
+                for inputs, labels in test_loader:
                     inputs = inputs.to(device)
                     labels = labels.to(device)
 
@@ -97,6 +98,7 @@ for train_index, val_index in skf.split(np.zeros(len(dataset)), labels):
                     FN += ((predicted == 0) & (labels == 1)).sum().item()
             sensitivity = TP / (TP + FN)
             specificity = TN / (TN + FP)
+            print("confusion matrix TP, TN, FP, FN:", TP, TN, FP, FN)
             print(f'Sensitivity: {sensitivity * 100}%')
             print(f'Specificity: {specificity * 100}%')
             print(f'Accuracy: {correct / total * 100}%')
